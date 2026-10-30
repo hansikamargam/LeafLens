@@ -20,7 +20,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(
     BASE_DIR,
     "model",
-    "leaflens_model.tflite"
+    "leaflens_best.tflite"
 )
 
 LABELS_PATH = os.path.join(
@@ -88,11 +88,9 @@ print("========================================")
 
 def validate_plant_image(image):
     """
-    Basic validation to determine whether the uploaded image
-    looks like a plant/leaf image.
-
-    This is a filtering step only.
-    It does NOT identify the plant disease.
+    Validate that the uploaded image can be decoded and meets
+    the minimum dimensions. This does NOT identify plant content
+    or disease.
     """
 
     # Convert PIL image to RGB
@@ -120,69 +118,6 @@ def validate_plant_image(image):
         )
 
 
-    # ---------------------------------------------
-    # 2. Check green vegetation
-    # ---------------------------------------------
-
-    hsv = cv2.cvtColor(
-        img,
-        cv2.COLOR_BGR2HSV
-    )
-
-    green_mask = cv2.inRange(
-        hsv,
-        np.array([35, 40, 40]),
-        np.array([85, 255, 255])
-    )
-
-    green_ratio = (
-        cv2.countNonZero(green_mask)
-        / green_mask.size
-    )
-
-
-    # ---------------------------------------------
-    # 3. Find largest green region
-    # ---------------------------------------------
-
-    contours, _ = cv2.findContours(
-        green_mask,
-        cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE
-    )
-
-    largest_green_ratio = 0
-
-    if contours:
-
-        largest_area = max(
-            cv2.contourArea(contour)
-            for contour in contours
-        )
-
-        image_area = height * width
-
-        if image_area > 0:
-            largest_green_ratio = (
-                largest_area / image_area
-            )
-
-
-    # ---------------------------------------------
-    # 4. Plant-image decision
-    # ---------------------------------------------
-
-    if (
-        green_ratio < 0.05
-        and largest_green_ratio < 0.10
-    ):
-        return False, (
-            "This image does not appear to contain "
-            "a plant leaf. Please upload a clear image "
-            "of a plant leaf."
-        )
-
-
     return True, "Plant image detected."
 
 
@@ -196,38 +131,21 @@ def predict_image(image):
     # Model expects 224 x 224 RGB
     # ---------------------------------------------
 
+    #image = image.convert("RGB")
+
+    #image = image.resize(
+    #    (224, 224)
+    #)
     image = image.convert("RGB")
-
-    image = image.resize(
-        (224, 224)
-    )
-
+    image = image.resize((224, 224))
+    
 
     # ---------------------------------------------
     # Convert image to NumPy
     # ---------------------------------------------
 
-    image_array = np.array(
-        image,
-        dtype=np.float32
-    )
-
-
-    # ---------------------------------------------
-    # MobileNetV2 preprocessing
-    # Convert 0-255 pixels to -1 to 1
-    # ---------------------------------------------
-
-
-
-    # ---------------------------------------------
-    # Add batch dimension
-    # ---------------------------------------------
-
-    image_array = np.expand_dims(
-        image_array,
-        axis=0
-    )
+    image_array = np.array(image, dtype=np.float32)
+    image_array = np.expand_dims(image_array, axis=0)
 
 
     # ---------------------------------------------
@@ -250,7 +168,8 @@ def predict_image(image):
         output_index
     )[0]
 
-
+    print("Output range:", predictions.min(), predictions.max())
+    print("Top prediction index:", np.argmax(predictions))
     # ---------------------------------------------
     # Get top 3 predictions
     # ---------------------------------------------
